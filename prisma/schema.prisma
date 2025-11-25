@@ -1,0 +1,615 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model EFMigrationsHistory {
+  migration_id    String @id(map: "pk___ef_migrations_history") @db.VarChar(150)
+  product_version String @db.VarChar(32)
+
+  @@map("__EFMigrationsHistory")
+}
+
+model blog_posts {
+  id             String     @id(map: "pk_blog_posts") @db.Uuid
+  user_id        String     @db.Uuid
+  title          String
+  content        String     @db.VarChar(2000)
+  post_type      Int
+  is_active      Boolean
+  created_on_utc DateTime   @db.Timestamptz(6)
+  updated_on_utc DateTime   @db.Timestamptz(6)
+  is_archived    Boolean    @default(false)
+  is_deleted     Boolean    @default(false)
+  users          users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_blog_posts_user_user_id")
+  comments       comments[]
+
+  @@index([user_id], map: "ix_blog_posts_user_id")
+}
+
+model comments {
+  id               String     @id(map: "pk_comments") @db.Uuid
+  blog_post_id     String     @db.Uuid
+  user_id          String     @db.Uuid
+  content          String     @db.VarChar(255)
+  is_active        Boolean
+  is_moderated     Boolean
+  moderated_on_utc DateTime?  @db.Timestamptz(6)
+  created_on_utc   DateTime   @db.Timestamptz(6)
+  updated_on_utc   DateTime   @db.Timestamptz(6)
+  is_archived      Boolean    @default(false)
+  is_deleted       Boolean    @default(false)
+  blog_posts       blog_posts @relation(fields: [blog_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_blog_posts_blog_post_id")
+  users            users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_user_user_id")
+
+  @@index([blog_post_id], map: "ix_comments_blog_post_id")
+  @@index([user_id], map: "ix_comments_user_id")
+}
+
+model compartments {
+  id           String       @id(map: "pk_compartments") @db.Uuid
+  name         String       @db.VarChar(100)
+  storage_id   String       @db.Uuid
+  notes        String?      @db.VarChar(500)
+  household_id String       @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
+  is_archived  Boolean      @default(false)
+  is_deleted   Boolean      @default(false)
+  households   households   @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_compartments_household_household_id")
+  storages     storages     @relation(fields: [storage_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_compartments_storage_storage_id")
+  food_items   food_items[]
+
+  @@index([household_id], map: "ix_compartments_household_id")
+  @@index([storage_id], map: "ix_compartments_storage_id")
+}
+
+model dietary_tags {
+  id                  String                @id(map: "pk_dietary_tags") @db.Uuid
+  name                String                @db.VarChar(100)
+  description         String?               @db.VarChar(500)
+  is_archived         Boolean
+  is_deleted          Boolean
+  food_dietary_tags   food_dietary_tags[]
+  recipe_dietary_tags recipe_dietary_tags[]
+  user_preferences    user_preferences[]
+}
+
+model food_dietary_tags {
+  id                String       @id(map: "pk_food_dietary_tags") @db.Uuid
+  food_reference_id String       @db.Uuid
+  dietary_tag_id    String       @db.Uuid
+  is_archived       Boolean
+  is_deleted        Boolean
+  dietary_tags      dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_dietary_tags_dietary_tags_dietary_tag_id")
+
+  @@unique([food_reference_id, dietary_tag_id], map: "ix_food_dietary_tags_food_reference_id_dietary_tag_id")
+  @@index([dietary_tag_id], map: "ix_food_dietary_tags_dietary_tag_id")
+}
+
+model food_item_logs {
+  id           String     @id(map: "pk_food_item_logs") @db.Uuid
+  food_item_id String     @db.Uuid
+  household_id String     @db.Uuid
+  user_id      String     @db.Uuid
+  timestamp    DateTime   @db.Timestamptz(6)
+  action       String     @db.VarChar(50)
+  quantity     Decimal    @db.Decimal(10, 3)
+  is_archived  Boolean
+  is_deleted   Boolean
+  unit_id      String     @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
+  food_items   food_items @relation(fields: [food_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_logs_food_items_food_item_id")
+  households   households @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_logs_household_household_id")
+  units        units      @relation(fields: [unit_id], references: [id], onUpdate: NoAction, map: "fk_food_item_logs_units_unit_id")
+  users        users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_logs_user_user_id")
+
+  @@index([food_item_id], map: "ix_food_item_logs_food_item_id")
+  @@index([household_id], map: "ix_food_item_logs_household_id")
+  @@index([unit_id], map: "ix_food_item_logs_unit_id")
+  @@index([user_id], map: "ix_food_item_logs_user_id")
+}
+
+model food_item_reservations {
+  id                   String          @id(map: "pk_food_item_reservations") @db.Uuid
+  food_item_id         String          @db.Uuid
+  household_id         String          @db.Uuid
+  reservation_date_utc DateTime        @db.Timestamptz(6)
+  quantity             Decimal         @db.Decimal(10, 3)
+  unit_id              String          @db.Uuid
+  status               Int
+  reservation_for      Int
+  giveaway_post_id     String?         @db.Uuid
+  meal_plan_id         String?         @db.Uuid
+  recipe_id            String?         @db.Uuid
+  is_archived          Boolean
+  is_deleted           Boolean
+  giveaway_posts       giveaway_posts? @relation(fields: [giveaway_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_reservations_giveaway_post_giveaway_post_id")
+  meal_plans           meal_plans?     @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_reservations_meal_plan_meal_plan_id")
+  recipes              recipes?        @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_reservations_recipe_recipe_id")
+
+  @@index([giveaway_post_id], map: "ix_food_item_reservations_giveaway_post_id")
+  @@index([meal_plan_id], map: "ix_food_item_reservations_meal_plan_id")
+  @@index([recipe_id], map: "ix_food_item_reservations_recipe_id")
+}
+
+model food_items {
+  id                String           @id(map: "pk_food_items") @db.Uuid
+  food_reference_id String           @db.Uuid
+  compartment_id    String           @db.Uuid
+  household_id      String           @db.Uuid
+  name              String           @db.VarChar(200)
+  image_url         String?          @db.VarChar(500)
+  quantity          Decimal          @db.Decimal(10, 3)
+  unit_id           String           @db.Uuid
+  expiration_date   DateTime         @db.Date
+  notes             String?          @db.VarChar(500)
+  added_by          String           @db.Uuid
+  last_modified_by  String?          @db.Uuid
+  is_archived       Boolean
+  is_deleted        Boolean
+  status            String           @default("") @db.VarChar(50)
+  food_item_logs    food_item_logs[]
+  compartments      compartments     @relation(fields: [compartment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_items_compartments_compartment_id")
+  food_references   food_references  @relation(fields: [food_reference_id], references: [id], onUpdate: NoAction, map: "fk_food_items_food_references_food_reference_id")
+  households        households       @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_items_household_household_id")
+  units             units            @relation(fields: [unit_id], references: [id], onUpdate: NoAction, map: "fk_food_items_units_unit_id")
+
+  @@index([compartment_id], map: "ix_food_items_compartment_id")
+  @@index([food_reference_id], map: "ix_food_items_food_reference_id")
+  @@index([household_id], map: "ix_food_items_household_id")
+  @@index([unit_id], map: "ix_food_items_unit_id")
+}
+
+model food_references {
+  id                              String               @id(map: "pk_food_references") @db.Uuid
+  name                            String               @db.VarChar(255)
+  food_group                      String               @db.VarChar(50)
+  food_category_id                Int?
+  brand                           String?              @db.VarChar(200)
+  barcode                         String?              @db.VarChar(100)
+  usda_id                         String               @db.VarChar(100)
+  typical_shelf_life_days_pantry  Int                  @default(0)
+  typical_shelf_life_days_fridge  Int                  @default(0)
+  typical_shelf_life_days_freezer Int                  @default(0)
+  image_url                       String?              @db.VarChar(500)
+  created_on_utc                  DateTime             @db.Timestamptz(6)
+  updated_on_utc                  DateTime             @db.Timestamptz(6)
+  added_by                        String?              @db.Uuid
+  is_archived                     Boolean              @default(false)
+  is_deleted                      Boolean              @default(false)
+  unit_type                       String               @default("") @db.VarChar(50)
+  food_items                      food_items[]
+  grocery_list_items              grocery_list_items[]
+  recipe_ingredients              recipe_ingredients[]
+}
+
+model giveaway_claims {
+  id               String         @id(map: "pk_giveaway_claims") @db.Uuid
+  giveaway_post_id String         @db.Uuid
+  claimant_id      String         @db.Uuid
+  status           Int
+  message          String?
+  created_on_utc   DateTime       @db.Timestamptz(6)
+  is_archived      Boolean        @default(false)
+  is_deleted       Boolean        @default(false)
+  giveaway_posts   giveaway_posts @relation(fields: [giveaway_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_giveaway_claims_giveaway_post_giveaway_post_id")
+  users            users          @relation(fields: [claimant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_giveaway_claims_user_claimant_id")
+
+  @@index([claimant_id], map: "ix_giveaway_claims_claimant_id")
+  @@index([giveaway_post_id], map: "ix_giveaway_claims_giveaway_post_id")
+}
+
+model giveaway_posts {
+  id                     String                   @id(map: "pk_giveaway_posts") @db.Uuid
+  user_id                String                   @db.Uuid
+  food_item_id           String                   @db.Uuid
+  title_description      String
+  contact_info           String
+  status                 Int
+  pickup_start_date      DateTime?                @db.Timestamptz(6)
+  pickup_end_date        DateTime?                @db.Timestamptz(6)
+  pickup_option          Int
+  address                String
+  quantity               Decimal                  @db.Decimal
+  created_on_utc         DateTime                 @db.Timestamptz(6)
+  updated_on_utc         DateTime                 @db.Timestamptz(6)
+  is_archived            Boolean                  @default(false)
+  is_deleted             Boolean                  @default(false)
+  food_item_reservations food_item_reservations[]
+  giveaway_claims        giveaway_claims[]
+  users                  users                    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_giveaway_posts_user_user_id")
+
+  @@index([user_id], map: "ix_giveaway_posts_user_id")
+}
+
+model grocery_list {
+  id                     String                   @id(map: "pk_grocery_list") @db.Uuid
+  household_id           String                   @db.Uuid
+  name                   String
+  created_by             String                   @db.Uuid
+  created_on_utc         DateTime                 @db.Timestamptz(6)
+  updated_on_utc         DateTime                 @db.Timestamptz(6)
+  is_archived            Boolean
+  is_deleted             Boolean
+  grocery_list_assignees grocery_list_assignees[]
+  grocery_list_items     grocery_list_items[]
+}
+
+model grocery_list_assignees {
+  id                  String       @id(map: "pk_grocery_list_assignees") @db.Uuid
+  grocery_list_id     String       @db.Uuid
+  household_member_id String       @db.Uuid
+  is_completed        Boolean      @default(false)
+  assigned_on_utc     DateTime     @db.Timestamptz(6)
+  is_archived         Boolean
+  is_deleted          Boolean
+  grocery_list        grocery_list @relation(fields: [grocery_list_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grocery_list_assignees_grocery_list_grocery_list_id")
+  users               users        @relation(fields: [household_member_id], references: [id], onUpdate: NoAction, map: "fk_grocery_list_assignees_user_household_member_id")
+
+  @@unique([grocery_list_id, household_member_id], map: "ix_grocery_list_assignees_grocery_list_id_household_member_id")
+  @@index([household_member_id], map: "ix_grocery_list_assignees_household_member_id")
+}
+
+model grocery_list_items {
+  id              String          @id(map: "pk_grocery_list_items") @db.Uuid
+  list_id         String          @db.Uuid
+  food_ref_id     String          @db.Uuid
+  custom_name     String?         @db.VarChar(200)
+  quantity        Decimal         @db.Decimal(10, 2)
+  unit_id         String?         @db.Uuid
+  notes           String?         @db.VarChar(500)
+  priority        String
+  added_by        String          @db.Uuid
+  created_on_utc  DateTime        @db.Timestamptz(6)
+  is_archived     Boolean
+  is_deleted      Boolean
+  food_references food_references @relation(fields: [food_ref_id], references: [id], onUpdate: NoAction, map: "fk_grocery_list_items_food_references_food_ref_id")
+  grocery_list    grocery_list    @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grocery_list_items_grocery_list_list_id")
+  units           units?          @relation(fields: [unit_id], references: [id], onUpdate: NoAction, map: "fk_grocery_list_items_units_unit_id")
+  users           users           @relation(fields: [added_by], references: [id], onUpdate: NoAction, map: "fk_grocery_list_items_user_added_by")
+
+  @@index([added_by], map: "ix_grocery_list_items_added_by")
+  @@index([food_ref_id], map: "ix_grocery_list_items_food_ref_id")
+  @@index([list_id, food_ref_id], map: "ix_grocery_list_items_list_id_food_ref_id")
+  @@index([unit_id], map: "ix_grocery_list_items_unit_id")
+}
+
+model households {
+  id                         String           @id(map: "pk_households") @db.Uuid
+  name                       String           @db.VarChar(200)
+  invite_code                String?          @db.VarChar(15)
+  invite_code_expiration_utc DateTime?        @db.Timestamptz(6)
+  is_archived                Boolean          @default(false)
+  is_deleted                 Boolean          @default(false)
+  compartments               compartments[]
+  food_item_logs             food_item_logs[]
+  food_items                 food_items[]
+  meal_plans                 meal_plans[]
+  storages                   storages[]
+  users                      users[]
+}
+
+model meal_plan_recipes {
+  id           String     @id(map: "pk_meal_plan_recipes") @db.Uuid
+  meal_plan_id String     @db.Uuid
+  recipe_id    String     @db.Uuid
+  is_archived  Boolean
+  is_deleted   Boolean
+  meal_plans   meal_plans @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meal_plan_recipes_meal_plans_meal_plan_id")
+
+  @@unique([meal_plan_id, recipe_id], map: "ix_meal_plan_recipes_meal_plan_id_recipe_id")
+}
+
+model meal_plans {
+  id                     String                   @id(map: "pk_meal_plans") @db.Uuid
+  household_id           String                   @db.Uuid
+  name                   String
+  scheduled_date         DateTime                 @db.Date
+  created_by             String                   @db.Uuid
+  created_on_utc         DateTime                 @db.Timestamptz(6)
+  updated_on_utc         DateTime                 @db.Timestamptz(6)
+  meal_type              String                   @default(dbgenerated("0"))
+  notes                  String?                  @db.VarChar(500)
+  servings               Int                      @default(0)
+  is_archived            Boolean                  @default(false)
+  is_deleted             Boolean                  @default(false)
+  food_item_reservations food_item_reservations[]
+  meal_plan_recipes      meal_plan_recipes[]
+  households             households               @relation(fields: [household_id], references: [id], onUpdate: NoAction, map: "fk_meal_plans_households_household_id")
+
+  @@index([household_id], map: "ix_meal_plans_household_id")
+}
+
+model outbox_messages {
+  id               String    @id(map: "pk_outbox_messages") @db.Uuid
+  occurred_on_utc  DateTime  @db.Timestamptz(6)
+  type             String
+  content          Json
+  processed_on_utc DateTime? @db.Timestamptz(6)
+  error            String?
+}
+
+model payments {
+  id                   String             @id(map: "pk_payments") @db.Uuid
+  user_id              String             @db.Uuid
+  subscription_plan_id String             @db.Uuid
+  order_code           BigInt             @default(autoincrement())
+  payment_link_id      String?
+  description          String             @db.VarChar(500)
+  amount_due           BigInt
+  amount_paid          BigInt
+  currency             String             @db.VarChar(3)
+  status               Int
+  checkout_url         String?
+  qr_code              String?
+  created_at           DateTime           @db.Timestamptz(6)
+  expires_at           DateTime?          @db.Timestamptz(6)
+  paid_at              DateTime?          @db.Timestamptz(6)
+  cancelled_at         DateTime?          @db.Timestamptz(6)
+  cancellation_reason  String?            @db.VarChar(500)
+  is_archived          Boolean
+  is_deleted           Boolean
+  subscription_plans   subscription_plans @relation(fields: [subscription_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_subscription_plan_subscription_plan_id")
+  users                users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_user_user_id")
+
+  @@index([subscription_plan_id], map: "ix_payments_subscription_plan_id")
+  @@index([user_id], map: "ix_payments_user_id")
+}
+
+model permissions {
+  code             String             @id(map: "pk_permissions") @db.VarChar(100)
+  name             String             @db.VarChar(100)
+  description      String             @db.VarChar(500)
+  role_permissions role_permissions[]
+}
+
+model recipe_dietary_tags {
+  id             String       @id(map: "pk_recipe_dietary_tags") @db.Uuid
+  recipe_id      String       @db.Uuid
+  dietary_tag_id String       @db.Uuid
+  is_archived    Boolean
+  is_deleted     Boolean
+  dietary_tags   dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_dietary_tags_dietary_tags_dietary_tag_id")
+
+  @@unique([recipe_id, dietary_tag_id], map: "ix_recipe_dietary_tags_recipe_id_dietary_tag_id")
+  @@index([dietary_tag_id], map: "ix_recipe_dietary_tags_dietary_tag_id")
+}
+
+model recipe_directions {
+  id             String   @id(map: "pk_recipe_directions") @db.Uuid
+  recipe_id      String   @db.Uuid
+  step_number    Int
+  description    String   @db.VarChar(1000)
+  image_url      String?
+  created_on_utc DateTime @db.Timestamptz(6)
+  updated_on_utc DateTime @db.Timestamptz(6)
+  is_archived    Boolean  @default(false)
+  is_deleted     Boolean  @default(false)
+}
+
+model recipe_ingredients {
+  id              String          @id(map: "pk_recipe_ingredients") @db.Uuid
+  recipe_id       String          @db.Uuid
+  food_ref_id     String          @db.Uuid
+  quantity        Decimal         @db.Decimal
+  unit_id         String          @db.Uuid
+  notes           String?         @db.VarChar(255)
+  created_on_utc  DateTime        @db.Timestamptz(6)
+  updated_on_utc  DateTime        @db.Timestamptz(6)
+  is_archived     Boolean         @default(false)
+  is_deleted      Boolean         @default(false)
+  food_references food_references @relation(fields: [food_ref_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_ingredients_food_references_food_ref_id")
+  recipes         recipes         @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_ingredients_recipes_recipe_id")
+  units           units           @relation(fields: [unit_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_ingredients_units_unit_id")
+
+  @@index([food_ref_id], map: "ix_recipe_ingredients_food_ref_id")
+  @@index([recipe_id], map: "ix_recipe_ingredients_recipe_id")
+  @@index([unit_id], map: "ix_recipe_ingredients_unit_id")
+}
+
+model recipe_media {
+  id          String  @id(map: "pk_recipe_media") @db.Uuid
+  url         String  @db.VarChar(2048)
+  recipe_id   String  @db.Uuid
+  mime_type   String  @db.VarChar(50)
+  is_archived Boolean
+  is_deleted  Boolean
+  recipes     recipes @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_media_recipe_recipe_id")
+
+  @@index([recipe_id], map: "ix_recipe_media_recipe_id")
+}
+
+model recipes {
+  id                       String                   @id(map: "pk_recipes") @db.Uuid
+  title                    String                   @db.VarChar(200)
+  description              String                   @default("") @db.VarChar(2000)
+  recipe_prep_time_minutes Int                      @default(0)
+  recipe_cook_time_minutes Int                      @default(0)
+  notes                    String?                  @db.VarChar(1000)
+  servings                 Int?
+  difficulty_level         String?                  @db.VarChar(50)
+  calories_per_serving     Int?
+  image_url                String?                  @db.VarChar(500)
+  created_by               String?                  @db.Uuid
+  prep_time_minutes        Int
+  cook_time_minutes        Int
+  is_public                Boolean
+  created_on_utc           DateTime                 @db.Timestamptz(6)
+  updated_on_utc           DateTime                 @db.Timestamptz(6)
+  is_archived              Boolean                  @default(false)
+  is_deleted               Boolean                  @default(false)
+  food_item_reservations   food_item_reservations[]
+  recipe_ingredients       recipe_ingredients[]
+  recipe_media             recipe_media[]
+}
+
+model role_permissions {
+  permission_code String      @db.VarChar(100)
+  role_name       String      @db.VarChar(50)
+  permissions     permissions @relation(fields: [permission_code], references: [code], onDelete: Cascade, onUpdate: NoAction, map: "fk_role_permissions_permissions_permission_code")
+  roles           roles       @relation(fields: [role_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_role_permissions_roles_role_name")
+
+  @@id([permission_code, role_name], map: "pk_role_permissions")
+  @@index([role_name], map: "ix_role_permissions_role_name")
+}
+
+model roles {
+  name             String             @id(map: "pk_roles") @db.VarChar(50)
+  type             String             @default("") @db.VarChar(50)
+  role_permissions role_permissions[]
+  user_roles       user_roles[]
+}
+
+model storages {
+  id           String         @id(map: "pk_storages") @db.Uuid
+  name         String         @db.VarChar(100)
+  household_id String         @db.Uuid
+  type         String         @db.VarChar(50)
+  notes        String?        @db.VarChar(500)
+  is_archived  Boolean        @default(false)
+  is_deleted   Boolean        @default(false)
+  compartments compartments[]
+  households   households     @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storages_households_household_id")
+
+  @@index([household_id], map: "ix_storages_household_id")
+}
+
+model subscription_features {
+  id              String        @id(map: "pk_subscription_features") @db.Uuid
+  subscription_id String        @db.Uuid
+  feature         String        @db.VarChar(50)
+  limit_quota     Int?
+  limit_reset_per String?       @db.VarChar(50)
+  is_archived     Boolean
+  is_deleted      Boolean
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_subscriptions_subscription_id")
+
+  @@index([subscription_id], map: "ix_subscription_features_subscription_id")
+}
+
+model subscription_plans {
+  id              String        @id(map: "pk_subscription_plans") @db.Uuid
+  subscription_id String        @db.Uuid
+  price_amount    BigInt
+  price_currency  String        @db.VarChar(3)
+  duration_value  Int
+  duration_unit   String        @db.VarChar(50)
+  is_archived     Boolean
+  is_deleted      Boolean
+  payments        payments[]
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_plans_subscriptions_subscription_id")
+
+  @@index([subscription_id], map: "ix_subscription_plans_subscription_id")
+}
+
+model subscriptions {
+  id                    String                  @id(map: "pk_subscriptions") @db.Uuid
+  name                  String                  @db.VarChar(100)
+  description           String                  @db.VarChar(500)
+  is_archived           Boolean
+  is_deleted            Boolean
+  subscription_features subscription_features[]
+  subscription_plans    subscription_plans[]
+  user_subscriptions    user_subscriptions[]
+}
+
+model units {
+  id                 String               @id(map: "pk_units") @db.Uuid
+  name               String               @db.VarChar(50)
+  abbreviation       String               @db.VarChar(20)
+  to_base_factor     Decimal              @db.Decimal(10, 3)
+  is_archived        Boolean              @default(false)
+  is_deleted         Boolean              @default(false)
+  type               String               @default("") @db.VarChar(50)
+  food_item_logs     food_item_logs[]
+  food_items         food_items[]
+  grocery_list_items grocery_list_items[]
+  recipe_ingredients recipe_ingredients[]
+}
+
+model user_entitlements {
+  id              String  @id(map: "pk_user_entitlements") @db.Uuid
+  user_id         String  @db.Uuid
+  feature         String  @db.VarChar(50)
+  usage_count     Int
+  limit_quota     Int?
+  limit_reset_per String? @db.VarChar(50)
+  is_archived     Boolean
+  is_deleted      Boolean
+  users           users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_users_user_id")
+
+  @@index([user_id], map: "ix_user_entitlements_user_id")
+}
+
+model user_preferences {
+  id             String       @id(map: "pk_user_preferences") @db.Uuid
+  user_id        String       @db.Uuid
+  dietary_tag_id String       @db.Uuid
+  created_on_utc DateTime     @db.Timestamptz(6)
+  is_archived    Boolean
+  is_deleted     Boolean
+  dietary_tags   dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_preferences_dietary_tags_dietary_tag_id")
+
+  @@unique([user_id, dietary_tag_id], map: "ix_user_preferences_user_id_dietary_tag_id")
+  @@index([dietary_tag_id], map: "ix_user_preferences_dietary_tag_id")
+}
+
+model user_roles {
+  role_name String @db.VarChar(50)
+  user_id   String @db.Uuid
+  roles     roles  @relation(fields: [role_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_roles_roles_name")
+  users     users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_roles_user_user_id")
+
+  @@id([role_name, user_id], map: "pk_user_roles")
+  @@index([user_id], map: "ix_user_roles_user_id")
+}
+
+model user_subscriptions {
+  id                  String        @id(map: "pk_user_subscriptions") @db.Uuid
+  user_id             String        @db.Uuid
+  subscription_id     String        @db.Uuid
+  status              String        @db.VarChar(50)
+  start_date          DateTime      @db.Date
+  end_date            DateTime?     @db.Date
+  paused_date         DateTime?     @db.Date
+  resumed_date        DateTime?     @db.Date
+  cancelled_date_utc  DateTime?     @db.Date
+  cancellation_reason String?       @db.VarChar(500)
+  is_archived         Boolean
+  is_deleted          Boolean
+  subscriptions       subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_subscriptions_subscription_id")
+  users               users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_users_user_id")
+
+  @@index([subscription_id], map: "ix_user_subscriptions_subscription_id")
+  @@index([user_id], map: "ix_user_subscriptions_user_id")
+}
+
+model users {
+  id                     String                   @id(map: "pk_users") @db.Uuid
+  household_id           String?                  @db.Uuid
+  avatar_url             String?
+  email                  String                   @unique(map: "ix_users_email") @db.VarChar(300)
+  first_name             String                   @db.VarChar(200)
+  last_name              String                   @db.VarChar(200)
+  identity_id            String                   @unique(map: "ix_users_identity_id")
+  created_at             DateTime                 @db.Timestamptz(6)
+  updated_at             DateTime?                @db.Timestamptz(6)
+  is_archived            Boolean                  @default(false)
+  is_deleted             Boolean                  @default(false)
+  blog_posts             blog_posts[]
+  comments               comments[]
+  food_item_logs         food_item_logs[]
+  giveaway_claims        giveaway_claims[]
+  giveaway_posts         giveaway_posts[]
+  grocery_list_assignees grocery_list_assignees[]
+  grocery_list_items     grocery_list_items[]
+  payments               payments[]
+  user_entitlements      user_entitlements[]
+  user_roles             user_roles[]
+  user_subscriptions     user_subscriptions[]
+  households             households?              @relation(fields: [household_id], references: [id], onUpdate: NoAction, map: "fk_users_households_household_id")
+
+  @@index([household_id], map: "ix_users_household_id")
+}
