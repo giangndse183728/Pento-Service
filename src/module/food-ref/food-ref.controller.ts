@@ -25,13 +25,5 @@ export class FoodRefController {
     return this.foodRefService.search(query);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get food reference by ID' })
-  @ApiParam({ name: 'id', description: 'Food reference ID' })
-  @ApiResponse({ status: 200, description: 'Food reference details' })
-  @ApiResponse({ status: 404, description: 'Food reference not found' })
-  findOne(@Param('id') id: string) {
-    return this.foodRefService.findOne(id);
-  }
 }
 

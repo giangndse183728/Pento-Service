@@ -9,6 +9,7 @@ import { PrismaModule } from './lib/prisma/prisma.module';
 
 @Module({
   imports: [
+    FoodRefModule,
     PrismaModule,
     ChatbotModule,
     ScanFoodModule,

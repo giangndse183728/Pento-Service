@@ -1,10 +1,10 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model EFMigrationsHistory {
@@ -337,11 +337,11 @@ model payments {
   subscription_plan_id String             @db.Uuid
   order_code           BigInt             @default(autoincrement())
   payment_link_id      String?
-  description          String             @db.VarChar(500)
+  description          String             @db.VarChar(100)
   amount_due           BigInt
   amount_paid          BigInt
   currency             String             @db.VarChar(3)
-  status               Int
+  status               String             @db.VarChar(20)
   checkout_url         String?
   qr_code              String?
   created_at           DateTime           @db.Timestamptz(6)
@@ -351,6 +351,7 @@ model payments {
   cancellation_reason  String?            @db.VarChar(500)
   is_archived          Boolean
   is_deleted           Boolean
+  provider_description String?            @db.VarChar(40)
   subscription_plans   subscription_plans @relation(fields: [subscription_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_subscription_plan_subscription_plan_id")
   users                users              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_user_user_id")
 
@@ -477,16 +478,18 @@ model storages {
 }
 
 model subscription_features {
-  id              String        @id(map: "pk_subscription_features") @db.Uuid
-  subscription_id String        @db.Uuid
-  feature         String        @db.VarChar(50)
-  limit_quota     Int?
-  limit_reset_per String?       @db.VarChar(50)
-  is_archived     Boolean
-  is_deleted      Boolean
-  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_subscriptions_subscription_id")
+  id                    String        @id(map: "pk_subscription_features") @db.Uuid
+  subscription_id       String        @db.Uuid
+  feature_name          String        @db.VarChar(100)
+  entitlement_quota     Int?
+  entitlement_reset_per String?       @db.VarChar(50)
+  is_archived           Boolean
+  is_deleted            Boolean
+  features              features      @relation(fields: [feature_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_features_feature_name")
+  subscriptions         subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_subscriptions_subscription_id")
 
   @@index([subscription_id], map: "ix_subscription_features_subscription_id")
+  @@index([feature_name], map: "ix_subscription_features_feature_name")
 }
 
 model subscription_plans {
@@ -494,8 +497,8 @@ model subscription_plans {
   subscription_id String        @db.Uuid
   price_amount    BigInt
   price_currency  String        @db.VarChar(3)
-  duration_value  Int
-  duration_unit   String        @db.VarChar(50)
+  duration_value  Int?
+  duration_unit   String?       @db.VarChar(10)
   is_archived     Boolean
   is_deleted      Boolean
   payments        payments[]
@@ -506,7 +509,7 @@ model subscription_plans {
 
 model subscriptions {
   id                    String                  @id(map: "pk_subscriptions") @db.Uuid
-  name                  String                  @db.VarChar(100)
+  name                  String                  @db.VarChar(20)
   description           String                  @db.VarChar(500)
   is_archived           Boolean
   is_deleted            Boolean
@@ -530,17 +533,19 @@ model units {
 }
 
 model user_entitlements {
-  id              String  @id(map: "pk_user_entitlements") @db.Uuid
-  user_id         String  @db.Uuid
-  feature         String  @db.VarChar(50)
-  usage_count     Int
-  limit_quota     Int?
-  limit_reset_per String? @db.VarChar(50)
-  is_archived     Boolean
-  is_deleted      Boolean
-  users           users   @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_users_user_id")
+  id                    String   @id(map: "pk_user_entitlements") @db.Uuid
+  user_id               String   @db.Uuid
+  feature_name          String   @db.VarChar(100)
+  usage_count           Int
+  entitlement_quota     Int?
+  entitlement_reset_per String?  @db.VarChar(50)
+  is_archived           Boolean
+  is_deleted            Boolean
+  features              features @relation(fields: [feature_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_features_feature_name")
+  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_users_user_id")
 
   @@index([user_id], map: "ix_user_entitlements_user_id")
+  @@index([feature_name], map: "ix_user_entitlements_feature_name")
 }
 
 model user_preferences {
@@ -612,4 +617,10 @@ model users {
   households             households?              @relation(fields: [household_id], references: [id], onUpdate: NoAction, map: "fk_users_households_household_id")
 
   @@index([household_id], map: "ix_users_household_id")
+}
+
+model features {
+  name                  String                  @id(map: "pk_features") @db.VarChar(100)
+  subscription_features subscription_features[]
+  user_entitlements     user_entitlements[]
 }
