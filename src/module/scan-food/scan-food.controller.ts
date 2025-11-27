@@ -84,5 +84,60 @@ export class ScanFoodController {
       file.mimetype,
     );
   }
+
+  @Post('bill')
+  @UseInterceptors(FileInterceptor('billImage'))
+  @ApiOperation({
+    summary: 'Scan grocery bill and create food references',
+    description:
+      'Upload a grocery bill image. Google Vision OCR extracts the text, Gemini structures items, and they are saved as food references.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        billImage: {
+          type: 'string',
+          format: 'binary',
+          description: 'Receipt/bill image file (JPEG, PNG, WebP, GIF)',
+        },
+      },
+      required: ['billImage'],
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Receipt scan results with created references',
+    type: ScanFoodResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid request or unsupported image format',
+  })
+  async scanFoodBill(
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<ScanFoodResponseDto> {
+    if (!file) {
+      throw new BadRequestException('Bill image file is required');
+    }
+
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Unsupported image format. Allowed: ${ALLOWED_MIME_TYPES.join(', ')}`,
+      );
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      throw new BadRequestException(
+        `File too large. Maximum size: ${MAX_FILE_SIZE / 1024 / 1024}MB`,
+      );
+    }
+
+    return this.scanFoodService.scanBillAndCreateFoodReferences(
+      file.buffer,
+      file.mimetype,
+    );
+  }
 }
 

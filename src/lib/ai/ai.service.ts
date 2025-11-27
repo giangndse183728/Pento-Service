@@ -24,7 +24,7 @@ When helpful, suggest in-app flows (e.g., open Scanner, add item, set expiry, vi
 
   constructor() {
     const apiKey =
-      process.env.GEM_KEY ;
+      process.env.GEM_KEY;
     if (apiKey) {
       this.genAI = new GoogleGenerativeAI(apiKey);
     } else {

@@ -104,5 +104,74 @@ Rules:
       throw new Error(`Food scan failed: ${err?.message ?? 'Unknown error'}`);
     }
   }
+
+  async generateFoodItemsFromReceipt(
+    ocrText: string,
+  ): Promise<FoodScanResult[]> {
+    if (!this.genAI) {
+      throw new Error('Gemini API key is not configured');
+    }
+
+    const prompt = `
+You are a food receipt analyst. Based on the OCR text from a grocery bill, extract individual food items and map them to structured data.
+
+The OCR text will be provided between triple quotes. Ignore prices or quantities unless helpful for determining unit types. Focus on grocery food items (skip non-food entries).
+
+Return STRICT JSON (no markdown) with this structure:
+[
+  {
+    "name": "string (specific food item)",
+    "foodGroup": "string (one of: ${FOOD_GROUP_ENUM_STRING})",
+    "notes": "string (include quantity info if available)",
+    "typicalShelfLifeDays_Pantry": number (typical shelf life in days when stored in pantry, 0 if not applicable),
+    "typicalShelfLifeDays_Fridge": number (typical shelf life in days when stored in fridge, 0 if not applicable),
+    "typicalShelfLifeDays_Freezer": number (typical shelf life in days when stored in freezer, 0 if not applicable),
+    "unitType": "string (${UNIT_TYPE_ENUM_STRING})"
+  }
+]
+
+Rules:
+- Maximum 10 items.
+- If foodGroup is "MixedDishes", unitType must be "Count".
+- Shelf life values must be integers (0 when not applicable).
+- For unitType, use the most appropriate unit based on OCR text
+- Be accurate with shelf life estimates based on standard food safety guidelines for fresh, unprocessed foods
+- Only output JSON, no explanation.
+
+OCR TEXT:
+"""
+${ocrText}
+"""
+`.trim();
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: this.modelName,
+      });
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text()?.trim();
+      if (!text) {
+        throw new Error('Gemini returned no content for receipt analysis');
+      }
+
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      const parsed = JSON.parse(text);
+      const results: FoodScanResult[] = Array.isArray(parsed)
+        ? parsed.slice(0, 10)
+        : [parsed];
+
+      return results.map((item) => ({
+        ...item,
+        unitType: item.foodGroup === 'MixedDishes' ? 'Count' : item.unitType,
+      }));
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Gemini receipt parsing failed', err?.stack);
+      throw new Error(
+        `Receipt parsing failed: ${err?.message ?? 'Unknown error'}`,
+      );
+    }
+  }
 }
 

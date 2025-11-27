@@ -2,17 +2,26 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AiScanService, FoodScanResult } from '../../lib/ai/ai-scan.service';
 import { ImageSearchService } from '../../lib/image-search/image-search.service';
 import { PrismaService } from '../../lib/prisma/prisma.service';
-import { FoodItemDto, ScanFoodResponseDto } from './dto/scan-food-response.dto';
+import {
+  FoodItemDto,
+  ScanFoodResponseDto,
+} from './dto/scan-food-response.dto';
 import { randomUUID } from 'crypto';
+import { VisionOcrService } from '../../lib/vision/vision-ocr.service';
+import { Prisma, food_references } from '@prisma/client';
+import Fuse from 'fuse.js';
 
 @Injectable()
 export class ScanFoodService {
   private readonly logger = new Logger(ScanFoodService.name);
+  private foodRefIndex?: Fuse<FoodReferenceCandidate>;
+  private readonly fuseThreshold = 0.35;
 
   constructor(
     private readonly aiScanService: AiScanService,
     private readonly imageSearchService: ImageSearchService,
     private readonly prismaService: PrismaService,
+    private readonly visionOcrService: VisionOcrService,
   ) {}
 
   async scanAndCreateFoodReferences(
@@ -44,28 +53,16 @@ export class ScanFoodService {
       const imageResults =
         await this.imageSearchService.searchMultipleFoodImages(foodNames);
 
-      // Step 3: Prepare food items with images
-      const foodItems: FoodItemDto[] = scanResults.map((result) => ({
-        name: result.name,
-        foodGroup: result.foodGroup,
-        notes: result.notes,
-        typicalShelfLifeDays_Pantry: result.typicalShelfLifeDays_Pantry,
-        typicalShelfLifeDays_Fridge: result.typicalShelfLifeDays_Fridge,
-        typicalShelfLifeDays_Freezer: result.typicalShelfLifeDays_Freezer,
-        unitType: result.unitType,
-        imageUrl: imageResults.get(result.name)?.imageUrl || null,
-      }));
-
-      // Step 4: Create bulk food_references in database
-      this.logger.log('Creating food references in database...');
-      const createdIds = await this.createBulkFoodReferences(
+      // Step 3: Create or reuse food references in database
+      this.logger.log('Creating or reusing food references in database...');
+      const { items, createdIds } = await this.createBulkFoodReferences(
         scanResults,
         imageResults,
       );
 
       return {
         success: true,
-        items: foodItems,
+        items,
         createdIds,
       };
     } catch (error) {
@@ -80,40 +77,216 @@ export class ScanFoodService {
     }
   }
 
+  async scanBillAndCreateFoodReferences(
+    imageBuffer: Buffer,
+    mimeType: string,
+  ): Promise<ScanFoodResponseDto> {
+    try {
+      this.logger.log('Running Google Vision OCR on receipt image...');
+      const ocrText = await this.visionOcrService.extractText(imageBuffer);
+
+      this.logger.log('Generating structured items from OCR text via Gemini...');
+      const scanResults =
+        await this.aiScanService.generateFoodItemsFromReceipt(ocrText);
+
+      if (!scanResults.length) {
+        return {
+          success: false,
+          items: [],
+          createdIds: [],
+          error: 'No food items could be extracted from the receipt',
+        };
+      }
+
+      const foodNames = scanResults.map((r) => r.name);
+      const imageResults =
+        await this.imageSearchService.searchMultipleFoodImages(foodNames);
+
+      const { items, createdIds } = await this.createBulkFoodReferences(
+        scanResults,
+        imageResults,
+      );
+
+      return {
+        success: true,
+        items,
+        createdIds,
+      };
+    } catch (error) {
+      const err = error as Error;
+      this.logger.error('Scan food bill failed', err?.stack);
+      return {
+        success: false,
+        items: [],
+        createdIds: [],
+        error: err?.message ?? 'Unknown error occurred',
+      };
+    }
+  }
+
   private async createBulkFoodReferences(
     scanResults: FoodScanResult[],
-    imageResults: Map<string, { imageUrl: string | null; title: string | null }>,
-  ): Promise<string[]> {
+    imageResults: Map<
+      string,
+      { imageUrl: string | null; title: string | null }
+    >,
+  ): Promise<{ createdIds: string[]; items: FoodItemDto[] }> {
+    await this.ensureFoodReferenceIndex();
+
     const now = new Date();
     const createdIds: string[] = [];
+    const items: FoodItemDto[] = [];
+    const recordsToCreate: Prisma.food_referencesCreateManyInput[] = [];
 
-    const dataToCreate = scanResults.map((result) => {
+    for (const result of scanResults) {
+      const imageUrl = imageResults.get(result.name)?.imageUrl || null;
+      const existing = await this.findExistingFoodReference(result.name);
+
+      if (existing) {
+        items.push({
+          name: existing.name,
+          foodGroup: existing.food_group,
+          notes: result.notes,
+          typicalShelfLifeDays_Pantry: existing.typical_shelf_life_days_pantry,
+          typicalShelfLifeDays_Fridge: existing.typical_shelf_life_days_fridge,
+          typicalShelfLifeDays_Freezer: existing.typical_shelf_life_days_freezer,
+          unitType: existing.unit_type,
+          imageUrl: existing.image_url ?? imageUrl,
+          referenceId: existing.id,
+          isExistingReference: true,
+        });
+        continue;
+      }
+
       const id = randomUUID();
       createdIds.push(id);
 
-      return {
+      const record: Prisma.food_referencesCreateManyInput = {
         id,
         name: result.name,
         food_group: result.foodGroup,
-        usda_id: `AI-SCAN-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        usda_id: `AI-SCAN-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 9)}`,
         typical_shelf_life_days_pantry: result.typicalShelfLifeDays_Pantry,
         typical_shelf_life_days_fridge: result.typicalShelfLifeDays_Fridge,
         typical_shelf_life_days_freezer: result.typicalShelfLifeDays_Freezer,
         unit_type: result.unitType,
-        image_url: imageResults.get(result.name)?.imageUrl || null,
+        image_url: imageUrl,
         created_on_utc: now,
         updated_on_utc: now,
         is_archived: false,
         is_deleted: false,
       };
+
+      recordsToCreate.push(record);
+
+      items.push({
+        name: record.name,
+        foodGroup: record.food_group,
+        notes: result.notes,
+        typicalShelfLifeDays_Pantry: record.typical_shelf_life_days_pantry ?? 0,
+        typicalShelfLifeDays_Fridge: record.typical_shelf_life_days_fridge ?? 0,
+        typicalShelfLifeDays_Freezer:
+          record.typical_shelf_life_days_freezer ?? 0,
+        unitType: record.unit_type ?? result.unitType,
+        imageUrl: record.image_url || null,
+        referenceId: id,
+        isExistingReference: false,
+      });
+
+      this.addFoodReferenceToIndex({
+        id,
+        name: record.name,
+        food_group: record.food_group,
+        typical_shelf_life_days_pantry:
+          record.typical_shelf_life_days_pantry ?? 0,
+        typical_shelf_life_days_fridge:
+          record.typical_shelf_life_days_fridge ?? 0,
+        typical_shelf_life_days_freezer:
+          record.typical_shelf_life_days_freezer ?? 0,
+        unit_type: record.unit_type ?? 'Weight',
+        image_url: record.image_url ?? null,
+      });
+    }
+
+    if (recordsToCreate.length) {
+      await this.prismaService.food_references.createMany({
+        data: recordsToCreate,
+      });
+      this.logger.log(`Created ${recordsToCreate.length} new food references`);
+    } else {
+      this.logger.log('All scanned items matched existing food references');
+    }
+
+    return { createdIds, items };
+  }
+
+  private async ensureFoodReferenceIndex(): Promise<void> {
+    if (this.foodRefIndex) {
+      return;
+    }
+
+    const references = await this.prismaService.food_references.findMany({
+      where: {
+        is_deleted: false,
+        is_archived: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        food_group: true,
+        typical_shelf_life_days_pantry: true,
+        typical_shelf_life_days_fridge: true,
+        typical_shelf_life_days_freezer: true,
+        unit_type: true,
+        image_url: true,
+      },
     });
 
-    await this.prismaService.food_references.createMany({
-      data: dataToCreate,
+    this.foodRefIndex = new Fuse(references, {
+      keys: ['name'],
+      includeScore: true,
+      threshold: this.fuseThreshold,
     });
+    this.logger.log(
+      `Initialized food reference index with ${references.length} entries`,
+    );
+  }
 
-    this.logger.log(`Created ${createdIds.length} food references`);
-    return createdIds;
+  private addFoodReferenceToIndex(candidate: FoodReferenceCandidate): void {
+    if (!this.foodRefIndex) {
+      return;
+    }
+    this.foodRefIndex.add(candidate);
+  }
+
+  private async findExistingFoodReference(
+    name: string,
+  ): Promise<food_references | null> {
+    await this.ensureFoodReferenceIndex();
+    if (!this.foodRefIndex) {
+      return null;
+    }
+
+    const [best] = this.foodRefIndex.search(name, { limit: 1 });
+    if (!best || best.score === undefined || best.score > this.fuseThreshold) {
+      return null;
+    }
+
+    return best.item as food_references;
   }
 }
+
+type FoodReferenceCandidate = Pick<
+  food_references,
+  | 'id'
+  | 'name'
+  | 'food_group'
+  | 'typical_shelf_life_days_pantry'
+  | 'typical_shelf_life_days_fridge'
+  | 'typical_shelf_life_days_freezer'
+  | 'unit_type'
+  | 'image_url'
+>;
 

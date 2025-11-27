@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../lib/prisma/prisma.service';
 
 @Injectable()
@@ -7,16 +13,19 @@ export class FoodRefService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll() {
+  async findAll(sort?: 'alpha' | 'newest') {
     try {
+      const orderBy: Prisma.food_referencesOrderByWithRelationInput =
+        sort === 'newest'
+          ? { created_on_utc: 'desc' }
+          : { name: 'asc' };
+
       return await this.prisma.food_references.findMany({
         where: {
           is_deleted: false,
           is_archived: false,
         },
-        orderBy: {
-          name: 'asc',
-        },
+        orderBy,
       });
     } catch (error) {
       this.logger.error('Error fetching food references', error);

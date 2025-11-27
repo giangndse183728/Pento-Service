@@ -10,8 +10,14 @@ export class FoodRefController {
   @Get()
   @ApiOperation({ summary: 'Get all food references' })
   @ApiResponse({ status: 200, description: 'List of food references' })
-  findAll() {
-    return this.foodRefService.findAll();
+  @ApiQuery({
+    name: 'sort',
+    required: false,
+    description: 'Sorting strategy. Use "newest" for latest entries, default alphabetical.',
+    schema: { enum: ['alpha', 'newest'] },
+  })
+  findAll(@Query('sort') sort?: 'alpha' | 'newest') {
+    return this.foodRefService.findAll(sort);
   }
 
   @Get('search')

@@ -24,6 +24,16 @@ export class FoodItemDto {
 
   @ApiProperty({ description: 'Image URL from search', nullable: true })
   imageUrl!: string | null;
+
+  @ApiProperty({
+    description: 'ID of the food reference (existing or newly created)',
+  })
+  referenceId!: string;
+
+  @ApiProperty({
+    description: 'Indicates if the item reused an existing food reference',
+  })
+  isExistingReference!: boolean;
 }
 
 export class ScanFoodResponseDto {
