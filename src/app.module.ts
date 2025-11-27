@@ -6,6 +6,7 @@ import { ScanFoodModule } from './module/scan-food/scan-food.module';
 import { FoodRefModule } from './module/food-ref/food-ref.module';
 import { ImageSearchModule } from './module/image-search/image-search.module';
 import { PrismaModule } from './lib/prisma/prisma.module';
+import { AuthModule } from './module/auth/auth.module';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { PrismaModule } from './lib/prisma/prisma.module';
     ChatbotModule,
     ScanFoodModule,
     ImageSearchModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
