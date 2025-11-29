@@ -14,8 +14,7 @@ import Fuse from 'fuse.js';
 @Injectable()
 export class ScanFoodService {
   private readonly logger = new Logger(ScanFoodService.name);
-  private foodRefIndex?: Fuse<FoodReferenceCandidate>;
-  private readonly fuseThreshold = 0.35;
+  private readonly fuseThreshold = 0.4;
 
   constructor(
     private readonly aiScanService: AiScanService,
@@ -131,7 +130,8 @@ export class ScanFoodService {
       { imageUrl: string | null; title: string | null }
     >,
   ): Promise<{ createdIds: string[]; items: FoodItemDto[] }> {
-    await this.ensureFoodReferenceIndex();
+    // Build index once for the entire batch to avoid rebuilding N times
+    const foodRefIndex = await this.buildFoodReferenceIndex();
 
     const now = new Date();
     const createdIds: string[] = [];
@@ -140,7 +140,10 @@ export class ScanFoodService {
 
     for (const result of scanResults) {
       const imageUrl = imageResults.get(result.name)?.imageUrl || null;
-      const existing = await this.findExistingFoodReference(result.name);
+      const existing = await this.findExistingFoodReferenceWithIndex(
+        result.name,
+        foodRefIndex,
+      );
 
       if (existing) {
         items.push({
@@ -194,20 +197,6 @@ export class ScanFoodService {
         referenceId: id,
         isExistingReference: false,
       });
-
-      this.addFoodReferenceToIndex({
-        id,
-        name: record.name,
-        food_group: record.food_group,
-        typical_shelf_life_days_pantry:
-          record.typical_shelf_life_days_pantry ?? 0,
-        typical_shelf_life_days_fridge:
-          record.typical_shelf_life_days_fridge ?? 0,
-        typical_shelf_life_days_freezer:
-          record.typical_shelf_life_days_freezer ?? 0,
-        unit_type: record.unit_type ?? 'Weight',
-        image_url: record.image_url ?? null,
-      });
     }
 
     if (recordsToCreate.length) {
@@ -215,6 +204,8 @@ export class ScanFoodService {
         data: recordsToCreate,
       });
       this.logger.log(`Created ${recordsToCreate.length} new food references`);
+      // Rebuild index after createMany to ensure it's up-to-date
+      await this.rebuildFoodReferenceIndex();
     } else {
       this.logger.log('All scanned items matched existing food references');
     }
@@ -222,11 +213,7 @@ export class ScanFoodService {
     return { createdIds, items };
   }
 
-  private async ensureFoodReferenceIndex(): Promise<void> {
-    if (this.foodRefIndex) {
-      return;
-    }
-
+  private async buildFoodReferenceIndex(): Promise<Fuse<FoodReferenceCandidate>> {
     const references = await this.prismaService.food_references.findMany({
       where: {
         is_deleted: false,
@@ -244,37 +231,60 @@ export class ScanFoodService {
       },
     });
 
-    this.foodRefIndex = new Fuse(references, {
+    // Normalize names in the index for consistent matching
+    const normalizedReferences = references.map((ref) => ({
+      ...ref,
+      name: this.normalizeName(ref.name),
+    }));
+
+    const index = new Fuse(normalizedReferences, {
       keys: ['name'],
       includeScore: true,
       threshold: this.fuseThreshold,
     });
     this.logger.log(
-      `Initialized food reference index with ${references.length} entries`,
+      `Built food reference index with ${references.length} entries`,
     );
+    return index;
   }
 
-  private addFoodReferenceToIndex(candidate: FoodReferenceCandidate): void {
-    if (!this.foodRefIndex) {
-      return;
-    }
-    this.foodRefIndex.add(candidate);
+  private async rebuildFoodReferenceIndex(): Promise<void> {
+    // Rebuild index to ensure it's up-to-date after database changes
+    // This is called after createMany to refresh the index
+    await this.buildFoodReferenceIndex();
+  }
+
+  private normalizeName(name: string): string {
+    return name.trim().toLowerCase();
   }
 
   private async findExistingFoodReference(
     name: string,
   ): Promise<food_references | null> {
-    await this.ensureFoodReferenceIndex();
-    if (!this.foodRefIndex) {
-      return null;
-    }
+    // Build index fresh each time to avoid stale data in clustered environments
+    const foodRefIndex = await this.buildFoodReferenceIndex();
+    return this.findExistingFoodReferenceWithIndex(name, foodRefIndex);
+  }
 
-    const [best] = this.foodRefIndex.search(name, { limit: 1 });
+  private async findExistingFoodReferenceWithIndex(
+    name: string,
+    foodRefIndex: Fuse<FoodReferenceCandidate>,
+  ): Promise<food_references | null> {
+    // Normalize the name before fuzzy matching
+    const normalizedName = this.normalizeName(name);
+
+    const [best] = foodRefIndex.search(normalizedName, { limit: 1 });
     if (!best || best.score === undefined || best.score > this.fuseThreshold) {
       return null;
     }
 
-    return best.item as food_references;
+    // Fetch the full record from the database after fuzzy match
+    const matchedId = best.item.id;
+    const fullRecord = await this.prismaService.food_references.findUnique({
+      where: { id: matchedId },
+    });
+
+    return fullRecord;
   }
 }
 
