@@ -23,7 +23,6 @@ export class FoodRefService {
       return await this.prisma.food_references.findMany({
         where: {
           is_deleted: false,
-          is_archived: false,
         },
         orderBy,
       });
@@ -39,7 +38,6 @@ export class FoodRefService {
         where: {
           id,
           is_deleted: false,
-          is_archived: false,
         },
       });
 
@@ -62,7 +60,6 @@ export class FoodRefService {
       return await this.prisma.food_references.findMany({
         where: {
           is_deleted: false,
-          is_archived: false,
           OR: [
             { name: { contains: query, mode: 'insensitive' } },
             { barcode: { contains: query, mode: 'insensitive' } },
