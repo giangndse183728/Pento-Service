@@ -178,8 +178,6 @@ export class ScanFoodService {
         image_url: imageUrl,
         created_on_utc: now,
         updated_on_utc: now,
-        is_archived: false,
-        is_deleted: false,
       };
 
       recordsToCreate.push(record);
@@ -217,7 +215,6 @@ export class ScanFoodService {
     const references = await this.prismaService.food_references.findMany({
       where: {
         is_deleted: false,
-        is_archived: false,
       },
       select: {
         id: true,

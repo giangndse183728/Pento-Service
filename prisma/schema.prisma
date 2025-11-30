@@ -23,7 +23,6 @@ model blog_posts {
   is_active      Boolean
   created_on_utc DateTime   @db.Timestamptz(6)
   updated_on_utc DateTime   @db.Timestamptz(6)
-  is_archived    Boolean    @default(false)
   is_deleted     Boolean    @default(false)
   users          users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_blog_posts_user_user_id")
   comments       comments[]
@@ -41,7 +40,6 @@ model comments {
   moderated_on_utc DateTime?  @db.Timestamptz(6)
   created_on_utc   DateTime   @db.Timestamptz(6)
   updated_on_utc   DateTime   @db.Timestamptz(6)
-  is_archived      Boolean    @default(false)
   is_deleted       Boolean    @default(false)
   blog_posts       blog_posts @relation(fields: [blog_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_blog_posts_blog_post_id")
   users            users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_comments_user_user_id")
@@ -56,7 +54,6 @@ model compartments {
   storage_id   String       @db.Uuid
   notes        String?      @db.VarChar(500)
   household_id String       @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
-  is_archived  Boolean      @default(false)
   is_deleted   Boolean      @default(false)
   households   households   @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_compartments_household_household_id")
   storages     storages     @relation(fields: [storage_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_compartments_storage_storage_id")
@@ -70,7 +67,6 @@ model dietary_tags {
   id                  String                @id(map: "pk_dietary_tags") @db.Uuid
   name                String                @db.VarChar(100)
   description         String?               @db.VarChar(500)
-  is_archived         Boolean
   is_deleted          Boolean
   food_dietary_tags   food_dietary_tags[]
   recipe_dietary_tags recipe_dietary_tags[]
@@ -81,7 +77,6 @@ model food_dietary_tags {
   id                String       @id(map: "pk_food_dietary_tags") @db.Uuid
   food_reference_id String       @db.Uuid
   dietary_tag_id    String       @db.Uuid
-  is_archived       Boolean
   is_deleted        Boolean
   dietary_tags      dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_dietary_tags_dietary_tags_dietary_tag_id")
 
@@ -97,7 +92,6 @@ model food_item_logs {
   timestamp    DateTime   @db.Timestamptz(6)
   action       String     @db.VarChar(50)
   quantity     Decimal    @db.Decimal(10, 3)
-  is_archived  Boolean
   is_deleted   Boolean
   unit_id      String     @default(dbgenerated("'00000000-0000-0000-0000-000000000000'::uuid")) @db.Uuid
   food_items   food_items @relation(fields: [food_item_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_logs_food_items_food_item_id")
@@ -118,12 +112,11 @@ model food_item_reservations {
   reservation_date_utc DateTime        @db.Timestamptz(6)
   quantity             Decimal         @db.Decimal(10, 3)
   unit_id              String          @db.Uuid
-  status               Int
-  reservation_for      Int
+  status               String          @db.VarChar(10)
+  reservation_for      String          @db.VarChar(10)
   giveaway_post_id     String?         @db.Uuid
   meal_plan_id         String?         @db.Uuid
   recipe_id            String?         @db.Uuid
-  is_archived          Boolean
   is_deleted           Boolean
   giveaway_posts       giveaway_posts? @relation(fields: [giveaway_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_reservations_giveaway_post_giveaway_post_id")
   meal_plans           meal_plans?     @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_food_item_reservations_meal_plan_meal_plan_id")
@@ -147,7 +140,6 @@ model food_items {
   notes             String?          @db.VarChar(500)
   added_by          String           @db.Uuid
   last_modified_by  String?          @db.Uuid
-  is_archived       Boolean
   is_deleted        Boolean
   status            String           @default("") @db.VarChar(50)
   food_item_logs    food_item_logs[]
@@ -177,7 +169,6 @@ model food_references {
   created_on_utc                  DateTime             @db.Timestamptz(6)
   updated_on_utc                  DateTime             @db.Timestamptz(6)
   added_by                        String?              @db.Uuid
-  is_archived                     Boolean              @default(false)
   is_deleted                      Boolean              @default(false)
   unit_type                       String               @default("") @db.VarChar(50)
   food_items                      food_items[]
@@ -192,7 +183,6 @@ model giveaway_claims {
   status           Int
   message          String?
   created_on_utc   DateTime       @db.Timestamptz(6)
-  is_archived      Boolean        @default(false)
   is_deleted       Boolean        @default(false)
   giveaway_posts   giveaway_posts @relation(fields: [giveaway_post_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_giveaway_claims_giveaway_post_giveaway_post_id")
   users            users          @relation(fields: [claimant_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_giveaway_claims_user_claimant_id")
@@ -215,7 +205,6 @@ model giveaway_posts {
   quantity               Decimal                  @db.Decimal
   created_on_utc         DateTime                 @db.Timestamptz(6)
   updated_on_utc         DateTime                 @db.Timestamptz(6)
-  is_archived            Boolean                  @default(false)
   is_deleted             Boolean                  @default(false)
   food_item_reservations food_item_reservations[]
   giveaway_claims        giveaway_claims[]
@@ -231,7 +220,6 @@ model grocery_list {
   created_by             String                   @db.Uuid
   created_on_utc         DateTime                 @db.Timestamptz(6)
   updated_on_utc         DateTime                 @db.Timestamptz(6)
-  is_archived            Boolean
   is_deleted             Boolean
   grocery_list_assignees grocery_list_assignees[]
   grocery_list_items     grocery_list_items[]
@@ -243,7 +231,6 @@ model grocery_list_assignees {
   household_member_id String       @db.Uuid
   is_completed        Boolean      @default(false)
   assigned_on_utc     DateTime     @db.Timestamptz(6)
-  is_archived         Boolean
   is_deleted          Boolean
   grocery_list        grocery_list @relation(fields: [grocery_list_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grocery_list_assignees_grocery_list_grocery_list_id")
   users               users        @relation(fields: [household_member_id], references: [id], onUpdate: NoAction, map: "fk_grocery_list_assignees_user_household_member_id")
@@ -263,7 +250,6 @@ model grocery_list_items {
   priority        String
   added_by        String          @db.Uuid
   created_on_utc  DateTime        @db.Timestamptz(6)
-  is_archived     Boolean
   is_deleted      Boolean
   food_references food_references @relation(fields: [food_ref_id], references: [id], onUpdate: NoAction, map: "fk_grocery_list_items_food_references_food_ref_id")
   grocery_list    grocery_list    @relation(fields: [list_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_grocery_list_items_grocery_list_list_id")
@@ -281,7 +267,6 @@ model households {
   name                       String           @db.VarChar(200)
   invite_code                String?          @db.VarChar(15)
   invite_code_expiration_utc DateTime?        @db.Timestamptz(6)
-  is_archived                Boolean          @default(false)
   is_deleted                 Boolean          @default(false)
   compartments               compartments[]
   food_item_logs             food_item_logs[]
@@ -295,7 +280,6 @@ model meal_plan_recipes {
   id           String     @id(map: "pk_meal_plan_recipes") @db.Uuid
   meal_plan_id String     @db.Uuid
   recipe_id    String     @db.Uuid
-  is_archived  Boolean
   is_deleted   Boolean
   meal_plans   meal_plans @relation(fields: [meal_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_meal_plan_recipes_meal_plans_meal_plan_id")
 
@@ -313,7 +297,6 @@ model meal_plans {
   meal_type              String                   @default(dbgenerated("0"))
   notes                  String?                  @db.VarChar(500)
   servings               Int                      @default(0)
-  is_archived            Boolean                  @default(false)
   is_deleted             Boolean                  @default(false)
   food_item_reservations food_item_reservations[]
   meal_plan_recipes      meal_plan_recipes[]
@@ -349,7 +332,6 @@ model payments {
   paid_at              DateTime?          @db.Timestamptz(6)
   cancelled_at         DateTime?          @db.Timestamptz(6)
   cancellation_reason  String?            @db.VarChar(500)
-  is_archived          Boolean
   is_deleted           Boolean
   provider_description String?            @db.VarChar(40)
   subscription_plans   subscription_plans @relation(fields: [subscription_plan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_payments_subscription_plan_subscription_plan_id")
@@ -370,7 +352,6 @@ model recipe_dietary_tags {
   id             String       @id(map: "pk_recipe_dietary_tags") @db.Uuid
   recipe_id      String       @db.Uuid
   dietary_tag_id String       @db.Uuid
-  is_archived    Boolean
   is_deleted     Boolean
   dietary_tags   dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_dietary_tags_dietary_tags_dietary_tag_id")
 
@@ -386,7 +367,6 @@ model recipe_directions {
   image_url      String?
   created_on_utc DateTime @db.Timestamptz(6)
   updated_on_utc DateTime @db.Timestamptz(6)
-  is_archived    Boolean  @default(false)
   is_deleted     Boolean  @default(false)
 }
 
@@ -399,7 +379,6 @@ model recipe_ingredients {
   notes           String?         @db.VarChar(255)
   created_on_utc  DateTime        @db.Timestamptz(6)
   updated_on_utc  DateTime        @db.Timestamptz(6)
-  is_archived     Boolean         @default(false)
   is_deleted      Boolean         @default(false)
   food_references food_references @relation(fields: [food_ref_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_ingredients_food_references_food_ref_id")
   recipes         recipes         @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_ingredients_recipes_recipe_id")
@@ -411,13 +390,12 @@ model recipe_ingredients {
 }
 
 model recipe_media {
-  id          String  @id(map: "pk_recipe_media") @db.Uuid
-  url         String  @db.VarChar(2048)
-  recipe_id   String  @db.Uuid
-  mime_type   String  @db.VarChar(50)
-  is_archived Boolean
-  is_deleted  Boolean
-  recipes     recipes @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_media_recipe_recipe_id")
+  id         String  @id(map: "pk_recipe_media") @db.Uuid
+  url        String  @db.VarChar(2048)
+  recipe_id  String  @db.Uuid
+  mime_type  String  @db.VarChar(50)
+  is_deleted Boolean
+  recipes    recipes @relation(fields: [recipe_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_recipe_media_recipe_recipe_id")
 
   @@index([recipe_id], map: "ix_recipe_media_recipe_id")
 }
@@ -439,7 +417,6 @@ model recipes {
   is_public                Boolean
   created_on_utc           DateTime                 @db.Timestamptz(6)
   updated_on_utc           DateTime                 @db.Timestamptz(6)
-  is_archived              Boolean                  @default(false)
   is_deleted               Boolean                  @default(false)
   food_item_reservations   food_item_reservations[]
   recipe_ingredients       recipe_ingredients[]
@@ -469,7 +446,6 @@ model storages {
   household_id String         @db.Uuid
   type         String         @db.VarChar(50)
   notes        String?        @db.VarChar(500)
-  is_archived  Boolean        @default(false)
   is_deleted   Boolean        @default(false)
   compartments compartments[]
   households   households     @relation(fields: [household_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_storages_households_household_id")
@@ -478,31 +454,28 @@ model storages {
 }
 
 model subscription_features {
-  id                    String        @id(map: "pk_subscription_features") @db.Uuid
-  subscription_id       String        @db.Uuid
-  feature_name          String        @db.VarChar(100)
-  entitlement_quota     Int?
-  entitlement_reset_per String?       @db.VarChar(50)
-  is_archived           Boolean
-  is_deleted            Boolean
-  features              features      @relation(fields: [feature_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_features_feature_name")
-  subscriptions         subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_subscriptions_subscription_id")
+  id              String        @id(map: "pk_subscription_features") @db.Uuid
+  subscription_id String        @db.Uuid
+  feature_code    String        @db.VarChar(50)
+  quota           Int?
+  is_deleted      Boolean
+  reset_period    String?       @db.VarChar(10)
+  features        features      @relation(fields: [feature_code], references: [code], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_features_feature_code")
+  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_features_subscriptions_subscription_id")
 
   @@index([subscription_id], map: "ix_subscription_features_subscription_id")
-  @@index([feature_name], map: "ix_subscription_features_feature_name")
+  @@index([feature_code], map: "ix_subscription_features_feature_code")
 }
 
 model subscription_plans {
-  id              String        @id(map: "pk_subscription_plans") @db.Uuid
-  subscription_id String        @db.Uuid
-  price_amount    BigInt
-  price_currency  String        @db.VarChar(3)
-  duration_value  Int?
-  duration_unit   String?       @db.VarChar(10)
-  is_archived     Boolean
-  is_deleted      Boolean
-  payments        payments[]
-  subscriptions   subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_plans_subscriptions_subscription_id")
+  id               String        @id(map: "pk_subscription_plans") @db.Uuid
+  subscription_id  String        @db.Uuid
+  amount           BigInt
+  currency         String        @db.VarChar(3)
+  duration_in_days Int?
+  is_deleted       Boolean
+  payments         payments[]
+  subscriptions    subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_subscription_plans_subscriptions_subscription_id")
 
   @@index([subscription_id], map: "ix_subscription_plans_subscription_id")
 }
@@ -511,8 +484,8 @@ model subscriptions {
   id                    String                  @id(map: "pk_subscriptions") @db.Uuid
   name                  String                  @db.VarChar(20)
   description           String                  @db.VarChar(500)
-  is_archived           Boolean
   is_deleted            Boolean
+  is_active             Boolean                 @default(true)
   subscription_features subscription_features[]
   subscription_plans    subscription_plans[]
   user_subscriptions    user_subscriptions[]
@@ -523,7 +496,6 @@ model units {
   name               String               @db.VarChar(50)
   abbreviation       String               @db.VarChar(20)
   to_base_factor     Decimal              @db.Decimal(10, 3)
-  is_archived        Boolean              @default(false)
   is_deleted         Boolean              @default(false)
   type               String               @default("") @db.VarChar(50)
   food_item_logs     food_item_logs[]
@@ -533,19 +505,20 @@ model units {
 }
 
 model user_entitlements {
-  id                    String   @id(map: "pk_user_entitlements") @db.Uuid
-  user_id               String   @db.Uuid
-  feature_name          String   @db.VarChar(100)
-  usage_count           Int
-  entitlement_quota     Int?
-  entitlement_reset_per String?  @db.VarChar(50)
-  is_archived           Boolean
-  is_deleted            Boolean
-  features              features @relation(fields: [feature_name], references: [name], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_features_feature_name")
-  users                 users    @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_users_user_id")
+  id                   String              @id(map: "pk_user_entitlements") @db.Uuid
+  user_id              String              @db.Uuid
+  feature_code         String              @db.VarChar(50)
+  usage_count          Int
+  quota                Int?
+  reset_period         String?             @db.VarChar(10)
+  user_subscription_id String?             @db.Uuid
+  features             features            @relation(fields: [feature_code], references: [code], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_features_feature_code")
+  user_subscriptions   user_subscriptions? @relation(fields: [user_subscription_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_entitlements_user_subscription_user_subscription_id")
+  users                users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_entitlements_users_user_id")
 
   @@index([user_id], map: "ix_user_entitlements_user_id")
-  @@index([feature_name], map: "ix_user_entitlements_feature_name")
+  @@index([feature_code], map: "ix_user_entitlements_feature_code")
+  @@index([user_subscription_id], map: "ix_user_entitlements_user_subscription_id")
 }
 
 model user_preferences {
@@ -553,7 +526,6 @@ model user_preferences {
   user_id        String       @db.Uuid
   dietary_tag_id String       @db.Uuid
   created_on_utc DateTime     @db.Timestamptz(6)
-  is_archived    Boolean
   is_deleted     Boolean
   dietary_tags   dietary_tags @relation(fields: [dietary_tag_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_preferences_dietary_tags_dietary_tag_id")
 
@@ -572,20 +544,20 @@ model user_roles {
 }
 
 model user_subscriptions {
-  id                  String        @id(map: "pk_user_subscriptions") @db.Uuid
-  user_id             String        @db.Uuid
-  subscription_id     String        @db.Uuid
-  status              String        @db.VarChar(50)
-  start_date          DateTime      @db.Date
-  end_date            DateTime?     @db.Date
-  paused_date         DateTime?     @db.Date
-  resumed_date        DateTime?     @db.Date
-  cancelled_date_utc  DateTime?     @db.Date
-  cancellation_reason String?       @db.VarChar(500)
-  is_archived         Boolean
-  is_deleted          Boolean
-  subscriptions       subscriptions @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_subscriptions_subscription_id")
-  users               users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_users_user_id")
+  id                         String              @id(map: "pk_user_subscriptions") @db.Uuid
+  user_id                    String              @db.Uuid
+  subscription_id            String              @db.Uuid
+  status                     String              @db.VarChar(50)
+  start_date                 DateTime            @db.Date
+  end_date                   DateTime?           @db.Date
+  paused_date                DateTime?           @db.Date
+  cancelled_date             DateTime?           @db.Date
+  cancellation_reason        String?             @db.VarChar(500)
+  is_deleted                 Boolean
+  remaining_days_after_pause Int?
+  user_entitlements          user_entitlements[]
+  subscriptions              subscriptions       @relation(fields: [subscription_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_subscriptions_subscription_id")
+  users                      users               @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_user_subscriptions_users_user_id")
 
   @@index([subscription_id], map: "ix_user_subscriptions_subscription_id")
   @@index([user_id], map: "ix_user_subscriptions_user_id")
@@ -601,7 +573,6 @@ model users {
   identity_id            String                   @unique(map: "ix_users_identity_id")
   created_at             DateTime                 @db.Timestamptz(6)
   updated_at             DateTime?                @db.Timestamptz(6)
-  is_archived            Boolean                  @default(false)
   is_deleted             Boolean                  @default(false)
   blog_posts             blog_posts[]
   comments               comments[]
@@ -620,7 +591,11 @@ model users {
 }
 
 model features {
-  name                  String                  @id(map: "pk_features") @db.VarChar(100)
+  name                  String                  @db.VarChar(100)
+  code                  String                  @id(map: "pk_features") @default("") @db.VarChar(50)
+  default_quota         Int?
+  default_reset_period  String?                 @db.VarChar(10)
+  description           String                  @default("") @db.VarChar(500)
   subscription_features subscription_features[]
   user_entitlements     user_entitlements[]
 }
