@@ -14,7 +14,7 @@ import Fuse from 'fuse.js';
 @Injectable()
 export class ScanFoodService {
   private readonly logger = new Logger(ScanFoodService.name);
-  private readonly fuseThreshold = 0.4;
+  private readonly fuseThreshold = 0.6;
 
   constructor(
     private readonly aiScanService: AiScanService,
@@ -249,21 +249,11 @@ export class ScanFoodService {
   }
 
   private async rebuildFoodReferenceIndex(): Promise<void> {
-    // Rebuild index to ensure it's up-to-date after database changes
-    // This is called after createMany to refresh the index
     await this.buildFoodReferenceIndex();
   }
 
   private normalizeName(name: string): string {
     return name.trim().toLowerCase();
-  }
-
-  private async findExistingFoodReference(
-    name: string,
-  ): Promise<food_references | null> {
-    // Build index fresh each time to avoid stale data in clustered environments
-    const foodRefIndex = await this.buildFoodReferenceIndex();
-    return this.findExistingFoodReferenceWithIndex(name, foodRefIndex);
   }
 
   private async findExistingFoodReferenceWithIndex(
