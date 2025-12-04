@@ -19,7 +19,7 @@ export interface FoodScanResult {
 @Injectable()
 export class AiScanService {
   private readonly logger = new Logger(AiScanService.name);
-  private readonly modelName = 'gemini-2.5-pro-preview-06-05';
+  private readonly modelName = 'gemini-2.5-pro';
   private readonly genAI?: GoogleGenerativeAI;
 
   private readonly prompt = `You are a food information expert. Analyze this food image and identify what food items are visible.
