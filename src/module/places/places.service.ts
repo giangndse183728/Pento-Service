@@ -59,7 +59,6 @@ export class PlacesService {
     userId?: string,
   ): Promise<void> {
     if (!userId) {
-      // Guard should already enforce auth; double-check to avoid silent allow
       throw new ForbiddenException('User context is required');
     }
 
@@ -76,7 +75,6 @@ export class PlacesService {
 
     const { quota, usage_count } = entitlement;
 
-    // Only check quota if it's not null/undefined
     if (quota !== null && quota !== undefined && usage_count >= quota) {
       throw new ForbiddenException(
         `Quota exceeded for feature ${featureCode}. Usage: ${usage_count}/${quota}`,
@@ -84,10 +82,6 @@ export class PlacesService {
     }
   }
 
-  /**
-   * Increment entitlement usage after successful operation.
-   * Always increments usage_count even if quota is null.
-   */
   private async incrementUsage(
     featureCode: string,
     userId?: string,

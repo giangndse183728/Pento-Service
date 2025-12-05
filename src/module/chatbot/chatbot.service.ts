@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { AiService } from '../../lib/ai/ai.service';
 import { PrismaService } from '../../lib/prisma/prisma.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
@@ -13,18 +17,36 @@ export class ChatbotService {
   ) {}
 
   async chat(request: ChatRequestDto, userId?: string) {
+    await this.ensureFeatureAvailable('AI_CHEF', userId);
+
     const result = await this.aiService.chat(request.message);
 
-    // Increment usage_count for tracking (no quota check - unlimited chat)
     await this.incrementUsage('AI_CHEF', userId);
 
     return result;
   }
 
-  /**
-   * Increment entitlement usage after successful operation.
-   * No quota checking - chatbot is unlimited if quota is null.
-   */
+  private async ensureFeatureAvailable(
+    featureCode: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) {
+      throw new ForbiddenException('User context is required');
+    }
+
+    const entitlement = await this.prismaService.user_entitlements.findFirst({
+      where: {
+        user_id: userId,
+        feature_code: featureCode,
+      },
+    });
+
+    if (!entitlement) {
+      throw new ForbiddenException('Feature not available for this user');
+    }
+  }
+
+
   private async incrementUsage(
     featureCode: string,
     userId?: string,
