@@ -15,6 +15,11 @@ import {
 } from '@nestjs/swagger';
 import { ScanFoodService } from './scan-food.service';
 import { ScanFoodResponseDto } from './dto/scan-food-response.dto';
+import {
+  InjectKeycloakUser,
+  WithKeycloakAuth,
+} from '../auth/decorators/keycloak-auth.decorator';
+import { KeycloakUser } from '../auth/interfaces/keycloak-user.interface';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -31,6 +36,7 @@ export class ScanFoodController {
   constructor(private readonly scanFoodService: ScanFoodService) {}
 
   @Post()
+  @WithKeycloakAuth()
   @UseInterceptors(FileInterceptor('image'))
   @ApiOperation({
     summary: 'Scan food image and create food references',
@@ -62,6 +68,7 @@ export class ScanFoodController {
   })
   async scanFood(
     @UploadedFile() file: Express.Multer.File,
+    @InjectKeycloakUser() user: KeycloakUser,
   ): Promise<ScanFoodResponseDto> {
     if (!file) {
       throw new BadRequestException('Image file is required');
@@ -82,10 +89,12 @@ export class ScanFoodController {
     return this.scanFoodService.scanAndCreateFoodReferences(
       file.buffer,
       file.mimetype,
+      user.sub,
     );
   }
 
   @Post('bill')
+  @WithKeycloakAuth()
   @UseInterceptors(FileInterceptor('billImage'))
   @ApiOperation({
     summary: 'Scan grocery bill and create food references',
@@ -117,6 +126,7 @@ export class ScanFoodController {
   })
   async scanFoodBill(
     @UploadedFile() file: Express.Multer.File,
+    @InjectKeycloakUser() user: KeycloakUser,
   ): Promise<ScanFoodResponseDto> {
     if (!file) {
       throw new BadRequestException('Bill image file is required');
@@ -137,6 +147,7 @@ export class ScanFoodController {
     return this.scanFoodService.scanBillAndCreateFoodReferences(
       file.buffer,
       file.mimetype,
+      user.sub,
     );
   }
 }

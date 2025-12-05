@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { AiScanService, FoodScanResult } from '../../lib/ai/ai-scan.service';
 import { ImageSearchService } from '../../lib/image-search/image-search.service';
 import { PrismaService } from '../../lib/prisma/prisma.service';
@@ -26,8 +26,11 @@ export class ScanFoodService {
   async scanAndCreateFoodReferences(
     imageBuffer: Buffer,
     mimeType: string,
+    userId?: string,
   ): Promise<ScanFoodResponseDto> {
     try {
+      await this.ensureEntitlementAvailable('IMAGE_RECOGNITION', userId);
+
       // Step 1: Scan food image with Gemini 2.5 Pro
       this.logger.log('Scanning food image with Gemini AI...');
       const scanResults = await this.aiScanService.scanFoodImage(
@@ -59,6 +62,8 @@ export class ScanFoodService {
         imageResults,
       );
 
+      await this.incrementUsage('IMAGE_RECOGNITION', userId);
+
       return {
         success: true,
         items,
@@ -79,8 +84,11 @@ export class ScanFoodService {
   async scanBillAndCreateFoodReferences(
     imageBuffer: Buffer,
     mimeType: string,
+    userId?: string,
   ): Promise<ScanFoodResponseDto> {
     try {
+      await this.ensureEntitlementAvailable('OCR', userId);
+
       this.logger.log('Running Google Vision OCR on receipt image...');
       const ocrText = await this.visionOcrService.extractText(imageBuffer);
 
@@ -105,6 +113,8 @@ export class ScanFoodService {
         scanResults,
         imageResults,
       );
+
+      await this.incrementUsage('OCR', userId);
 
       return {
         success: true,
@@ -247,6 +257,62 @@ export class ScanFoodService {
 
   private async rebuildFoodReferenceIndex(): Promise<void> {
     await this.buildFoodReferenceIndex();
+  }
+
+  /**
+   * Ensure user has entitlement and quota for the given feature.
+   * Throws ForbiddenException if over quota or missing entitlement.
+   * If quota is null, skip the check but still allow the operation.
+   */
+  private async ensureEntitlementAvailable(
+    featureCode: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) {
+      // Guard should already enforce auth; double-check to avoid silent allow
+      throw new ForbiddenException('User context is required');
+    }
+
+    const entitlement = await this.prismaService.user_entitlements.findFirst({
+      where: {
+        user_id: userId,
+        feature_code: featureCode,
+      },
+    });
+
+    if (!entitlement) {
+      throw new ForbiddenException('Feature not available for this user');
+    }
+
+    const { quota, usage_count } = entitlement;
+
+    // Only check quota if it's not null/undefined
+    if (quota !== null && quota !== undefined && usage_count >= quota) {
+      throw new ForbiddenException(
+        `Quota exceeded for feature ${featureCode}. Usage: ${usage_count}/${quota}`,
+      );
+    }
+  }
+
+  /**
+   * Increment entitlement usage after successful operation.
+   * Always increments usage_count even if quota is null.
+   */
+  private async incrementUsage(
+    featureCode: string,
+    userId?: string,
+  ): Promise<void> {
+    if (!userId) return;
+
+    await this.prismaService.user_entitlements.updateMany({
+      where: {
+        user_id: userId,
+        feature_code: featureCode,
+      },
+      data: {
+        usage_count: { increment: 1 },
+      },
+    });
   }
 
   private normalizeName(name: string): string {
