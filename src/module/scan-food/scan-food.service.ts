@@ -259,17 +259,11 @@ export class ScanFoodService {
     await this.buildFoodReferenceIndex();
   }
 
-  /**
-   * Ensure user has entitlement and quota for the given feature.
-   * Throws ForbiddenException if over quota or missing entitlement.
-   * If quota is null, skip the check but still allow the operation.
-   */
   private async ensureEntitlementAvailable(
     featureCode: string,
     userId?: string,
   ): Promise<void> {
     if (!userId) {
-      // Guard should already enforce auth; double-check to avoid silent allow
       throw new ForbiddenException('User context is required');
     }
 
@@ -286,7 +280,6 @@ export class ScanFoodService {
 
     const { quota, usage_count } = entitlement;
 
-    // Only check quota if it's not null/undefined
     if (quota !== null && quota !== undefined && usage_count >= quota) {
       throw new ForbiddenException(
         `Quota exceeded for feature ${featureCode}. Usage: ${usage_count}/${quota}`,
@@ -294,10 +287,6 @@ export class ScanFoodService {
     }
   }
 
-  /**
-   * Increment entitlement usage after successful operation.
-   * Always increments usage_count even if quota is null.
-   */
   private async incrementUsage(
     featureCode: string,
     userId?: string,

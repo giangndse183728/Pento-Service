@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Controller,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -10,16 +11,13 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { ScanFoodService } from './scan-food.service';
 import { ScanFoodResponseDto } from './dto/scan-food-response.dto';
-import {
-  InjectKeycloakUser,
-  WithKeycloakAuth,
-} from '../auth/decorators/keycloak-auth.decorator';
-import { KeycloakUser } from '../auth/interfaces/keycloak-user.interface';
+import { WithKeycloakAuth } from '../auth/decorators/keycloak-auth.decorator';
 
 const ALLOWED_MIME_TYPES = [
   'image/jpeg',
@@ -44,6 +42,12 @@ export class ScanFoodController {
       'Upload a food image to be analyzed by Gemini AI. Detected food items will be saved to food_references.',
   })
   @ApiConsumes('multipart/form-data')
+  @ApiQuery({
+    name: 'userId',
+    required: true,
+    description: 'User ID',
+    type: String,
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -68,7 +72,7 @@ export class ScanFoodController {
   })
   async scanFood(
     @UploadedFile() file: Express.Multer.File,
-    @InjectKeycloakUser() user: KeycloakUser,
+    @Query('userId') userId: string,
   ): Promise<ScanFoodResponseDto> {
     if (!file) {
       throw new BadRequestException('Image file is required');
@@ -89,7 +93,7 @@ export class ScanFoodController {
     return this.scanFoodService.scanAndCreateFoodReferences(
       file.buffer,
       file.mimetype,
-      user.sub,
+      userId,
     );
   }
 
@@ -102,6 +106,12 @@ export class ScanFoodController {
       'Upload a grocery bill image. Google Vision OCR extracts the text, Gemini structures items, and they are saved as food references.',
   })
   @ApiConsumes('multipart/form-data')
+  @ApiQuery({
+    name: 'userId',
+    required: true,
+    description: 'User ID',
+    type: String,
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -126,7 +136,7 @@ export class ScanFoodController {
   })
   async scanFoodBill(
     @UploadedFile() file: Express.Multer.File,
-    @InjectKeycloakUser() user: KeycloakUser,
+    @Query('userId') userId: string,
   ): Promise<ScanFoodResponseDto> {
     if (!file) {
       throw new BadRequestException('Bill image file is required');
@@ -147,7 +157,7 @@ export class ScanFoodController {
     return this.scanFoodService.scanBillAndCreateFoodReferences(
       file.buffer,
       file.mimetype,
-      user.sub,
+      userId,
     );
   }
 }

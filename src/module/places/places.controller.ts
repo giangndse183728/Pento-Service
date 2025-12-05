@@ -4,8 +4,6 @@ import { PlacesService } from './places.service';
 import { NearbyPlace } from '../../lib/places/places.service';
 import { FoodGroup } from '../../common/constants/food-group.enum';
 import { WithKeycloakAuth } from '../auth/decorators/keycloak-auth.decorator';
-import { InjectKeycloakUser } from '../auth/decorators/keycloak-auth.decorator';
-import { KeycloakUser } from '../auth/interfaces/keycloak-user.interface';
 
 @ApiTags('places')
 @Controller('places')
@@ -55,6 +53,12 @@ export class PlacesController {
     description: 'Search radius in meters (default 2000)',
     type: Number,
   })
+  @ApiQuery({
+    name: 'userId',
+    required: true,
+    description: 'User ID',
+    type: String,
+  })
   @ApiResponse({
     status: 200,
     description: 'List of nearby places',
@@ -65,7 +69,7 @@ export class PlacesController {
     @Query('foodGroup') foodGroup: FoodGroup,
     @Query('lat') lat: string,
     @Query('lng') lng: string,
-    @InjectKeycloakUser() user: KeycloakUser,
+    @Query('userId') userId: string,
     @Query('radius') radius?: string,
   ): Promise<NearbyPlace[]> {
     const latitude = Number(lat);
@@ -77,7 +81,7 @@ export class PlacesController {
       latitude,
       longitude,
       radiusMeters,
-      user.sub,
+      userId,
     );
   }
 }

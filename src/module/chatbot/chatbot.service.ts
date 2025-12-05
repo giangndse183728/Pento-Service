@@ -34,6 +34,10 @@ export class ChatbotService {
       throw new ForbiddenException('User context is required');
     }
 
+    this.logger.debug(
+      `Checking entitlement for userId: ${userId}, featureCode: ${featureCode}`,
+    );
+
     const entitlement = await this.prismaService.user_entitlements.findFirst({
       where: {
         user_id: userId,
@@ -42,8 +46,28 @@ export class ChatbotService {
     });
 
     if (!entitlement) {
+      // Debug: Check if user has any entitlements at all
+      const allUserEntitlements =
+        await this.prismaService.user_entitlements.findMany({
+          where: {
+            user_id: userId,
+          },
+          select: {
+            feature_code: true,
+            user_id: true,
+          },
+        });
+
+      this.logger.warn(
+        `No entitlement found. UserId: ${userId}, FeatureCode: ${featureCode}. User's entitlements: ${JSON.stringify(allUserEntitlements)}`,
+      );
+
       throw new ForbiddenException('Feature not available for this user');
     }
+
+    this.logger.debug(
+      `Entitlement found: ${JSON.stringify({ quota: entitlement.quota, usage_count: entitlement.usage_count })}`,
+    );
   }
 
 
