@@ -1,7 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { PlacesService, NearbyPlace } from '../../lib/places/places.service';
+import { PlacesService } from './places.service';
+import { NearbyPlace } from '../../lib/places/places.service';
 import { FoodGroup } from '../../common/constants/food-group.enum';
+import { WithKeycloakAuth } from '../auth/decorators/keycloak-auth.decorator';
+import { InjectKeycloakUser } from '../auth/decorators/keycloak-auth.decorator';
+import { KeycloakUser } from '../auth/interfaces/keycloak-user.interface';
 
 @ApiTags('places')
 @Controller('places')
@@ -9,6 +13,7 @@ export class PlacesController {
   constructor(private readonly placesService: PlacesService) {}
 
   @Get('nearby')
+  @WithKeycloakAuth()
   @ApiOperation({
     summary: 'Get nearby food-related places by food group',
     description:
@@ -60,6 +65,7 @@ export class PlacesController {
     @Query('foodGroup') foodGroup: FoodGroup,
     @Query('lat') lat: string,
     @Query('lng') lng: string,
+    @InjectKeycloakUser() user: KeycloakUser,
     @Query('radius') radius?: string,
   ): Promise<NearbyPlace[]> {
     const latitude = Number(lat);
@@ -71,6 +77,7 @@ export class PlacesController {
       latitude,
       longitude,
       radiusMeters,
+      user.sub,
     );
   }
 }
