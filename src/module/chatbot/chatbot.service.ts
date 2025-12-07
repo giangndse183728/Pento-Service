@@ -133,7 +133,11 @@ export class ChatbotService {
         orderBy: {
           expiration_date: 'asc',
         },
-        include: {
+        select: {
+          id: true,
+          name: true,
+          quantity: true,
+          expiration_date: true,
           food_references: {
             select: {
               name: true,
