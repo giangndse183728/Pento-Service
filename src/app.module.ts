@@ -3,6 +3,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ChatbotModule } from './module/chatbot/chatbot.module';
 import { ScanFoodModule } from './module/scan-food/scan-food.module';
+import { ScanBarcodeModule } from './module/scan-barcode/scan-barcode.module';
 import { FoodRefModule } from './module/food-ref/food-ref.module';
 import { ImageSearchModule } from './module/image-search/image-search.module';
 import { PrismaModule } from './lib/prisma/prisma.module';
@@ -15,6 +16,7 @@ import { PlacesModule } from './module/places/places.module';
     PrismaModule,
     ChatbotModule,
     ScanFoodModule,
+    ScanBarcodeModule,
     ImageSearchModule,
     AuthModule,
     PlacesModule,
